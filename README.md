@@ -13,6 +13,6 @@ Please cite our paper with:
 }
 ```
 
-# Currently Implemented
-- [x] Mercury CPD Module (but still needs testing)
+## Currently Implemented
+- [x] CPD Module (but still needs testing)
 - [ ] Deep Momentum Network 
