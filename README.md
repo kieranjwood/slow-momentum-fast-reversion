@@ -14,5 +14,5 @@ Please cite our paper with:
 ```
 
 ## Currently Implemented
-- [x] CPD Module (but still needs testing)
+- [x] CPD Module (this version still requires testing)
 - [ ] Deep Momentum Network 
