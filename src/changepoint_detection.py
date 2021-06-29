@@ -18,12 +18,27 @@ MAX_ITERATIONS = 200
 class ChangePointsWithBounds(ChangePoints):
     def __init__(
         self,
-        kernels: List[Kernel],
+        kernels: Tuple[Kernel, Kernel],
         location: float,
         interval: Tuple[float, float],
         steepness: float = 1.0,
         name: Optional[str] = None,
     ):
+        """Overwrite the Chnagepoints class to
+        1) only take a single location
+        2) to bound that location to be bounded by interval
+
+
+        Args:
+            kernels (Tuple[Kernel, Kernel]): the left hand and right hand kernels
+            location (float): changepoint location initialisation, must lie within interval
+            interval (Tuple[float, float]): the interval which bounds the changepoint hyperparameter
+            steepness (float, optional): initialisation of the steepness parameter. Defaults to 1.0.
+            name (Optional[str], optional): class name. Defaults to None.
+
+        Raises:
+            ValueError: errors if intial changepoint location is not within interval
+        """
         # overwrite the locations variable to enforce bounds
         if location < interval[0] or location > interval[1]:
             raise ValueError(
@@ -53,19 +68,30 @@ class ChangePointsWithBounds(ChangePoints):
 def fit_matern_kernel(
     time_series_data: pd.DataFrame,
     variance: float = 1.0,
-    lengthscales: float = 1.0,
+    lengthscale: float = 1.0,
     likelihood_variance: float = 1.0,
 ) -> Tuple[float, Dict[str, float]]:
+    """Fit the Matern 3/2 kernel on a time-series
+
+    Args:
+        time_series_data (pd.DataFrame): time-series with ciolumns X and Y
+        variance (float, optional): variance parameter initialisation. Defaults to 1.0.
+        lengthscale (float, optional): lengthscale parameter initialisation. Defaults to 1.0.
+        likelihood_variance (float, optional): likelihood variance parameter initialisation. Defaults to 1.0.
+
+    Returns:
+        Tuple[float, Dict[str, float]]: negative log marginal likelihood and paramters after fitting the GP
+    """
     m = gpflow.models.GPR(
         data=(
             time_series_data.loc[:, ["X"]].to_numpy(),
             time_series_data.loc[:, ["Y"]].to_numpy(),
         ),
-        kernel=Matern32(variance=variance, lengthscales=lengthscales),
+        kernel=Matern32(variance=variance, lengthscales=lengthscale),
         noise_variance=likelihood_variance,
     )
     opt = gpflow.optimizers.Scipy()
-    nlmlc = opt.minimize(
+    nlml = opt.minimize(
         m.training_loss, m.trainable_variables, options=dict(maxiter=MAX_ITERATIONS)
     ).fun
     params = {
@@ -73,7 +99,7 @@ def fit_matern_kernel(
         "kM_lengthscales": m.kernel.lengthscales.numpy(),
         "kM_likelihood_variance": m.likelihood.variance.numpy(),
     }
-    return nlmlc, params
+    return nlml, params
 
 
 def fit_changepoint_kernel(
@@ -83,9 +109,29 @@ def fit_changepoint_kernel(
     k2_variance: float = 1.0,
     k2_lengthscale: float = 1.0,
     kC_likelihood_variance=1.0,
-    kC_changepoint_location=1.0,
+    kC_changepoint_location=None,
     kC_steepness=1.0,
 ) -> Tuple[float, float, Dict[str, float]]:
+    """Fit the Changepoint kernel on a time-series
+
+    Args:
+        time_series_data (pd.DataFrame): time-series with ciolumns X and Y
+        k1_variance (float, optional): variance parameter initialisation for k1. Defaults to 1.0.
+        k1_lengthscale (float, optional): lengthscale initialisation for k1. Defaults to 1.0.
+        k2_variance (float, optional): variance parameter initialisation for k2. Defaults to 1.0.
+        k2_lengthscale (float, optional): lengthscale initialisation for k2. Defaults to 1.0.
+        kC_likelihood_variance (float, optional): likelihood variance parameter initialisation. Defaults to 1.0.
+        kC_changepoint_location (float, optional): changepoint location initialisation, if None uses midpoint of interval. Defaults to None.
+        kC_steepness (float, optional): steepness parameter initialisation. Defaults to 1.0.
+
+    Returns:
+        Tuple[float, float, Dict[str, float]]: changepoint location, negative log marginal likelihood and paramters after fitting the GP
+    """
+    if not kC_changepoint_location:
+        kC_changepoint_location = (
+            time_series_data["X"].iloc[0] + time_series_data["X"].iloc[-1]
+        ) / 2.0
+
     m = gpflow.models.GPR(
         data=(
             time_series_data.loc[:, ["X"]].to_numpy(),
@@ -122,6 +168,15 @@ def fit_changepoint_kernel(
 def changepoint_severity(
     kC_nlml: Union[float, List[float]], kM_nlml: Union[float, List[float]]
 ) -> float:
+    """Changepoint score as detailed in https://arxiv.org/pdf/2105.13727.pdf
+
+    Args:
+        kC_nlml (Union[float, List[float]]): negative log marginal likelihood of Changepoint kernel
+        kM_nlml (Union[float, List[float]]): negative log marginal likelihood of Matern 3/2 kernel
+
+    Returns:
+        float: changepoint score
+    """
     normalized_nlml = kC_nlml - kM_nlml
     return 1 - 1 / (np.mean(np.exp(-normalized_nlml)) + 1)
 
@@ -139,6 +194,25 @@ def changepoint_loc_and_score(
     kC_changepoint_location=None,
     kC_steepness=1.0,
 ) -> Tuple[float, float, float, Dict[str, float], Dict[str, float]]:
+    """For a single time-series window, calcualte changepoint score and location as detailed in https://arxiv.org/pdf/2105.13727.pdf
+
+    Args:
+        time_series_data_window (pd.DataFrame): time-series with columns X and Y
+        kM_variance (float, optional): variance initialisation for Matern 3/2 kernel. Defaults to 1.0.
+        kM_lengthscale (float, optional): lengthscale initialisation for Matern 3/2 kernel. Defaults to 1.0.
+        kM_likelihood_variance (float, optional): likelihood variance initialisation for Matern 3/2 kernel. Defaults to 1.0.
+        k1_variance (float, optional): variance initialisation for Changepoint kernel k1, if None uses fitted variance parameter from Matern 3/2. Defaults to None.
+        k1_lengthscale (float, optional): lengthscale initialisation for Changepoint kernel k1, if None uses fitted lengthscale parameter from Matern 3/2. Defaults to None.
+        k2_variance (float, optional): variance initialisation for Changepoint kernel k2, if None uses fitted variance parameter from Matern 3/2. Defaults to None.
+        k2_lengthscale (float, optional): lengthscale initialisation for for Changepoint kernel k2, if None uses fitted lengthscale parameter from Matern 3/2. Defaults to None.
+        kC_likelihood_variance ([type], optional): likelihood variance initialisation for Changepoint kernel. Defaults to None.
+        kC_changepoint_location ([type], optional): changepoint location initialisation for Changepoint, if None uses midpoint of interval. Defaults to None.
+        kC_steepness (float, optional): changepoint location initialisation for Changepoint. Defaults to 1.0.
+
+    Returns:
+        Tuple[float, float, float, Dict[str, float], Dict[str, float]]: changepoint score, changepoint location, 
+        changepoint location normalised by interval length to [0,1], Matern 3/2 kernel parameters, Changepoint kernel parameters
+    """
 
     time_series_data = time_series_data_window.copy()
     Y_data = time_series_data[["Y"]].values
@@ -232,47 +306,43 @@ def run_module(
     output_csv_file_path: str,
     start_date: dt.datetime = None,
     end_date: dt.datetime = None,
-    use_kM_hyp_to_initialise_kC = True
+    use_kM_hyp_to_initialise_kC=True,
 ):
     """Run the changepoint detection module as described in https://arxiv.org/pdf/2105.13727.pdf
+    for all times (in date range if specified). Outputs results to a csv.
 
     Args:
-        time_series_data (pd.DataFrame): [description]
-        lookback_window_length (int): [description]
-        output_csv_file_path (str): [description]
-        start_date (dt.datetime, optional): [description]. Defaults to None.
-        end_date (dt.datetime, optional): [description]. Defaults to None.
+        time_series_data (pd.DataFrame): time series with date as index and with column daily_returns
+        lookback_window_length (int): lookback window length
+        output_csv_file_path (str): dull path, including csv extension to output results 
+        start_date (dt.datetime, optional): start date for module, if None use all (with burnin in period qualt to length of LBW). Defaults to None.
+        end_date (dt.datetime, optional): end date for module. Defaults to None.
+        use_kM_hyp_to_initialise_kC (bool, optional): initialise Changepoint kernel parameters using the paremters from fitting Matern 3/2 kernel. Defaults to True.
     """
     if start_date and end_date:
-        first_window = time_series_data.loc[:start_date].iloc[-(lookback_window_length + 1):, :]
+        first_window = time_series_data.loc[:start_date].iloc[
+            -(lookback_window_length + 1) :, :
+        ]
         remaining_data = time_series_data.loc[start_date:end_date, :]
         if remaining_data.index[0] == start_date:
-            remaining_data = remaining_data.iloc[1:,:]
+            remaining_data = remaining_data.iloc[1:, :]
         else:
             first_window = first_window.iloc[1:]
-        time_series_data = pd.concat(
-            [
-                first_window,
-                remaining_data
-            ]
-        ).copy()
+        time_series_data = pd.concat([first_window, remaining_data]).copy()
     elif not start_date and not end_date:
         time_series_data = time_series_data.copy()
     elif not start_date:
         time_series_data = time_series_data.iloc[:end_date, :].copy()
     elif not end_date:
-        first_window = time_series_data.loc[:start_date].iloc[-(lookback_window_length + 1):, :]
+        first_window = time_series_data.loc[:start_date].iloc[
+            -(lookback_window_length + 1) :, :
+        ]
         remaining_data = time_series_data.loc[start_date:, :]
         if remaining_data.index[0] == start_date:
-            remaining_data = remaining_data.iloc[1:,:]
+            remaining_data = remaining_data.iloc[1:, :]
         else:
             first_window = first_window.iloc[1:]
-        time_series_data = pd.concat(
-            [
-                first_window,
-                remaining_data
-            ]
-        ).copy()
+        time_series_data = pd.concat([first_window, remaining_data]).copy()
 
     csv_fields = ["date", "t", "cp_location", "cp_location_norm", "cp_score"]
     with open(output_csv_file_path, "w") as f:
@@ -284,14 +354,16 @@ def run_module(
     for time in range(lookback_window_length + 1, len(time_series_data)):
         ts_data_window = time_series_data.iloc[
             time - (lookback_window_length + 1) : time
-        ]
-        ts_data_window["X"] = ts_data_window.index.astype(float).copy()
-        ts_data_window["Y"] = ts_data_window["daily_returns"].copy()
-        window_date = ts_data_window["date"].iloc[-1].strftime('%Y-%m-%d')
+        ][["date", "daily_returns"]].copy()
+        ts_data_window["X"] = ts_data_window.index.astype(float)
+        ts_data_window = ts_data_window.rename(columns={"daily_returns": "Y"})
+        window_date = ts_data_window["date"].iloc[-1].strftime("%Y-%m-%d")
 
         try:
             if use_kM_hyp_to_initialise_kC:
-                cp_score, cp_loc, cp_loc_normalised, _, _ = changepoint_loc_and_score(ts_data_window)
+                cp_score, cp_loc, cp_loc_normalised, _, _ = changepoint_loc_and_score(
+                    ts_data_window
+                )
             else:
                 cp_score, cp_loc, cp_loc_normalised, _, _ = changepoint_loc_and_score(
                     ts_data_window,
