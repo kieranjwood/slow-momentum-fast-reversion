@@ -1,8 +1,8 @@
+import csv
+import datetime as dt
 from typing import Dict, List, Optional, Tuple, Union
 
-import csv
 import gpflow
-import datetime as dt
 import numpy as np
 import pandas as pd
 import tensorflow as tf
@@ -210,7 +210,7 @@ def changepoint_loc_and_score(
         kC_steepness (float, optional): changepoint location initialisation for Changepoint. Defaults to 1.0.
 
     Returns:
-        Tuple[float, float, float, Dict[str, float], Dict[str, float]]: changepoint score, changepoint location, 
+        Tuple[float, float, float, Dict[str, float], Dict[str, float]]: changepoint score, changepoint location,
         changepoint location normalised by interval length to [0,1], Matern 3/2 kernel parameters, Changepoint kernel parameters
     """
 
@@ -314,7 +314,7 @@ def run_module(
     Args:
         time_series_data (pd.DataFrame): time series with date as index and with column daily_returns
         lookback_window_length (int): lookback window length
-        output_csv_file_path (str): dull path, including csv extension to output results 
+        output_csv_file_path (str): dull path, including csv extension to output results
         start_date (dt.datetime, optional): start date for module, if None use all (with burnin in period qualt to length of LBW). Defaults to None.
         end_date (dt.datetime, optional): end date for module. Defaults to None.
         use_kM_hyp_to_initialise_kC (bool, optional): initialise Changepoint kernel parameters using the paremters from fitting Matern 3/2 kernel. Defaults to True.
