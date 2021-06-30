@@ -26,7 +26,7 @@ class ChangePointsWithBounds(ChangePoints):
     ):
         """Overwrite the Chnagepoints class to
         1) only take a single location
-        2) to bound that location to be bounded by interval
+        2) so location is bounded by interval
 
 
         Args:
@@ -74,7 +74,7 @@ def fit_matern_kernel(
     """Fit the Matern 3/2 kernel on a time-series
 
     Args:
-        time_series_data (pd.DataFrame): time-series with ciolumns X and Y
+        time_series_data (pd.DataFrame): time-series with columns X and Y
         variance (float, optional): variance parameter initialisation. Defaults to 1.0.
         lengthscale (float, optional): lengthscale parameter initialisation. Defaults to 1.0.
         likelihood_variance (float, optional): likelihood variance parameter initialisation. Defaults to 1.0.
@@ -293,7 +293,7 @@ def changepoint_loc_and_score(
         ) = fit_changepoint_kernel(time_series_data)
 
     cp_score = changepoint_severity(kC_nlml, kM_nlml)
-    cp_loc_normalised = (changepoint_location - time_series_data["X"].iloc[0]) / (
+    cp_loc_normalised = (time_series_data["X"].iloc[-1] - changepoint_location) / (
         time_series_data["X"].iloc[-1] - time_series_data["X"].iloc[0]
     )
 
@@ -351,12 +351,13 @@ def run_module(
 
     time_series_data["date"] = time_series_data.index
     time_series_data = time_series_data.reset_index(drop=True)
-    for time in range(lookback_window_length + 1, len(time_series_data)):
+    for window_end in range(lookback_window_length + 1, len(time_series_data)):
         ts_data_window = time_series_data.iloc[
-            time - (lookback_window_length + 1) : time
+            window_end - (lookback_window_length + 1) : window_end
         ][["date", "daily_returns"]].copy()
         ts_data_window["X"] = ts_data_window.index.astype(float)
         ts_data_window = ts_data_window.rename(columns={"daily_returns": "Y"})
+        time_index = window_end - 1
         window_date = ts_data_window["date"].iloc[-1].strftime("%Y-%m-%d")
 
         try:
@@ -381,4 +382,6 @@ def run_module(
         # #write the reults to the csv
         with open(output_csv_file_path, "a") as f:
             writer = csv.writer(f)
-            writer.writerow([window_date, time, cp_loc, cp_loc_normalised, cp_score])
+            writer.writerow(
+                [window_date, time_index, cp_loc, cp_loc_normalised, cp_score]
+            )

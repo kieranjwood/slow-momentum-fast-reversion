@@ -1,5 +1,5 @@
 import multiprocessing
-import os   
+import os
 
 OUTPUT_FOLDER = os.path.join("data", "commodities")
 
@@ -41,9 +41,12 @@ TICKERS = [
     "ZS=F",
     "ZT=F",
 ]
-# TICKERS = ["^FTSE", "^GSPC"]
-N_WORKERS =len(TICKERS)
 
-all_processes = [f'python script_cpd_example.py "{ticker}" "{os.path.join(OUTPUT_FOLDER, ticker + ".csv")}" "2000-01-01" "2019-12-31"' for ticker in TICKERS]
-process_pool = multiprocessing.Pool(processes = N_WORKERS)                                                        
+N_WORKERS = len(TICKERS)
+
+all_processes = [
+    f'python script_cpd_example.py "{ticker}" "{os.path.join(OUTPUT_FOLDER, ticker + ".csv")}" "2000-01-01" "2019-12-31"'
+    for ticker in TICKERS
+]
+process_pool = multiprocessing.Pool(processes=N_WORKERS)
 process_pool.map(os.system, all_processes)
