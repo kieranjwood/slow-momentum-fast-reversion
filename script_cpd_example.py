@@ -2,24 +2,22 @@ import argparse
 import datetime as dt
 
 import pandas as pd
-import yfinance as yf
 
 import src.changepoint_detection as cpd
 from src.data_prep import calc_returns
+from data.pull_data import pull_yahoo_sample_data
 
-USE_KM_HYP_TO_INITIALISE_KC = True
-LBW = 21
+from settings.default import CPD_DEFAULT_LBW, USE_KM_HYP_TO_INITIALISE_KC
 
 
 def main(
-    ticker: str, output_file_path: str, start_date: dt.datetime, end_date: dt.datetime
+    ticker: str, output_file_path: str, start_date: dt.datetime, end_date: dt.datetime, lookback_window_length :int
 ):
-    data_source = yf.Ticker(ticker)
-    data = data_source.history(period="max")
-    data["daily_returns"] = calc_returns(data["Close"])
+    data = pull_yahoo_sample_data(ticker)
+    data["daily_returns"] = calc_returns(data["close"])
 
     cpd.run_module(
-        data, LBW, output_file_path, start_date, end_date, USE_KM_HYP_TO_INITIALISE_KC
+        data, lookback_window_length, output_file_path, start_date, end_date, USE_KM_HYP_TO_INITIALISE_KC
     )
 
 
@@ -63,6 +61,14 @@ if __name__ == "__main__":
             default="2009-12-31",
             help="End date in format yyyy-mm-dd",
         )
+        parser.add_argument(
+            "lookback_window_length",
+            metavar="l",
+            type=int,
+            nargs="?",
+            default=CPD_DEFAULT_LBW,
+            help="CPD lookback window length",
+        )
 
         args = parser.parse_known_args()[0]
 
@@ -74,6 +80,7 @@ if __name__ == "__main__":
             args.output_file_path,
             start_date,
             end_date,
+            args.lookback_window_length
         )
 
     main(*get_args())

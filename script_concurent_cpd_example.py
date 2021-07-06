@@ -1,52 +1,16 @@
 import multiprocessing
 import os
 
-OUTPUT_FOLDER = os.path.join("data", "commodities")
+from settings.default import COMMODITIES_TICKERS, CPD_OUTPUT_FOLDER_DEFAULT
 
-# commodities from Yahoo Finance
-TICKERS = [
-    "CC=F",
-    "CL=F",
-    "CT=F",
-    "ES=F",
-    "GC=F",
-    "GF=F",
-    "HE=F",
-    "HG=F",
-    "HO=F",
-    "KC=F",
-    "KE=F",
-    "LBS=F",
-    "LE=F",
-    "MGC=F",
-    "NG=F",
-    "NQ=F",
-    "OJ=F",
-    "PA=F",
-    "PL=F",
-    "RB=F",
-    "RTY=F",
-    "SB=F",
-    "SI=F",
-    "SIL=F",
-    "YM=F",
-    "ZB=F",
-    "ZC=F",
-    "ZF=F",
-    "ZL=F",
-    "ZM=F",
-    "ZN=F",
-    "ZO=F",
-    "ZR=F",
-    "ZS=F",
-    "ZT=F",
-]
+N_WORKERS = len(COMMODITIES_TICKERS)
 
-N_WORKERS = len(TICKERS)
+if not os.path.exists(CPD_OUTPUT_FOLDER_DEFAULT):
+    os.mkdir(CPD_OUTPUT_FOLDER_DEFAULT)
 
 all_processes = [
-    f'python script_cpd_example.py "{ticker}" "{os.path.join(OUTPUT_FOLDER, ticker + ".csv")}" "2000-01-01" "2019-12-31"'
-    for ticker in TICKERS
+    f'python script_cpd_example.py "{ticker}" "{os.path.join(CPD_OUTPUT_FOLDER_DEFAULT, ticker + ".csv")}" "2000-01-01" "2019-12-31"'
+    for ticker in COMMODITIES_TICKERS
 ]
 process_pool = multiprocessing.Pool(processes=N_WORKERS)
 process_pool.map(os.system, all_processes)
