@@ -3,29 +3,10 @@ import os
 import numpy as np
 import pandas as pd
 
-from src.classical_strategies import macd_signal
+from src.classical_strategies import MACDStrategy, calc_returns, calc_daily_vol, calc_vol_scaled_returns
 
-VOL_LOOKBACK = 60  # for ex-ante volatility
-VOL_TARGET = 0.15  # 15% volatility target
 VOL_THRESHOLD = 5  # multiple to winsorise by
-SMOOTH_WINDOW = 252
-
-
-def calc_returns(srs: pd.Series, offset: int = 1) -> pd.Series:
-    """for each element of a pandas time-series srs,
-    calculates the returns over the past number of days
-    specified by offset
-
-    Args:
-        srs (pd.Series): time-series of prices
-        offset (int, optional): number of days to calculate returns over. Defaults to 1.
-
-    Returns:
-        pd.Series: series of returns
-    """
-    returns = srs / srs.shift(offset) - 1.0
-    return returns
-
+HALFLIFE_WINSORISE = 252
 
 def read_changepoint_results_and_fill_na(
     file_path: str, lookback_window_length: int
@@ -94,64 +75,62 @@ def deep_momentum_strategy_features(df_asset: pd.DataFrame) -> pd.DataFrame:
 
     # winsorize using rolling 5X standard deviations to remove outliers
     df_asset["srs"] = df_asset["close"]
-    ewm = df_asset["srs"].ewm(halflife=SMOOTH_WINDOW)
+    ewm = df_asset["srs"].ewm(halflife=HALFLIFE_WINSORISE)
     means = ewm.mean()
     stds = ewm.std()
-    ub = means + VOL_THRESHOLD * stds
-    lb = means - VOL_THRESHOLD * stds
-    df_asset["srs"] = np.minimum(df_asset["srs"], ub)
-    df_asset["srs"] = np.maximum(df_asset["srs"], lb)
+    df_asset["srs"] = np.minimum(df_asset["srs"], means + VOL_THRESHOLD * stds)
+    df_asset["srs"] = np.maximum(df_asset["srs"], means - VOL_THRESHOLD * stds)
 
-    df_asset["daily_returns"] = (df_asset["srs"] / df_asset["srs"].shift(1)) - 1
-    df_asset["daily_vol"] = (
-        df_asset["daily_returns"]
-        .ewm(span=VOL_LOOKBACK, min_periods=VOL_LOOKBACK)
-        .std()
-        .fillna(method="bfill")
-    )
+    df_asset["daily_returns"] = calc_returns(df_asset["srs"])
+    df_asset["daily_vol"] = calc_daily_vol(df_asset["daily_returns"])
+    # vol scaling and shift to be next day returns
+    df_asset["target_returns"] = calc_vol_scaled_returns(
+        df_asset["daily_returns"], df_asset["daily_returns"]
+    ).shift(-1)
 
-    df_asset["annualised_vol"] = df_asset["daily_vol"] * np.sqrt(252)
-
-    df_asset["scaled_returns"] = (
-        VOL_TARGET * df_asset["daily_returns"] / df_asset["annualised_vol"].shift(1)
-    )
-    df_asset["trading_rule_signal"] = (1 + df_asset["scaled_returns"]).cumprod()
-    df_asset["target_returns"] = (
-        df_asset["trading_rule_signal"].shift(-1) / df_asset["trading_rule_signal"] - 1
-    )
-
-    def calc_scaled_returns(offset):
+    def calc_normalised_returns(day_offset):
         return (
-            calc_returns(df_asset["srs"], offset)
+            calc_returns(df_asset["srs"], day_offset)
             / df_asset["daily_vol"]
-            / np.sqrt(offset)
-        )  # keeps this in a reasonable range
+            / np.sqrt(day_offset)
+        )
 
-    df_asset["norm_daily_return"] = calc_scaled_returns(1)
-    df_asset["norm_monthly_return"] = calc_scaled_returns(21)
-    df_asset["norm_quarterly_return"] = calc_scaled_returns(63)
-    df_asset["norm_biannual_return"] = calc_scaled_returns(126)
-    df_asset["norm_annual_return"] = calc_scaled_returns(252)
+    df_asset["norm_daily_return"] = calc_normalised_returns(1)
+    df_asset["norm_monthly_return"] = calc_normalised_returns(21)
+    df_asset["norm_quarterly_return"] = calc_normalised_returns(63)
+    df_asset["norm_biannual_return"] = calc_normalised_returns(126)
+    df_asset["norm_annual_return"] = calc_normalised_returns(252)
+
     trend_combinations = [(8, 24), (16, 48), (32, 96)]
-    # macd = MACDStrategy(trend_combinations)
     for short_window, long_window in trend_combinations:
-        df_asset[f"macd_{short_window}_{long_window}"] = macd_signal(
+        df_asset[f"macd_{short_window}_{long_window}"] = MACDStrategy.calc_signal(
             df_asset["srs"], short_window, long_window
         )
 
+    # date features
     df_asset["day_of_week"] = df_asset.index.isocalendar().day
     df_asset["day_of_month"] = df_asset.index.map(lambda d: d.day)
     df_asset["week_of_year"] = df_asset.index.isocalendar().week
     df_asset["month_of_year"] = df_asset.index.map(lambda d: d.month)
     df_asset["year"] = df_asset.index.isocalendar().year
     df_asset["date"] = df_asset.index  # duplication but sometimes makes life easier
-    # return df_asset[1:].fillna(0.0)
+
     return df_asset.dropna()
 
 
 def include_changepoint_features(
     features: pd.DataFrame, cpd_folder_name: pd.DataFrame, lookback_window_length: int
 ) -> pd.DataFrame:
+    """combine CP features and DMN featuress
+
+    Args:
+        features (pd.DataFrame): features
+        cpd_folder_name (pd.DataFrame): folder containing CPD results
+        lookback_window_length (int): LBW used for the CPD
+
+    Returns:
+        pd.DataFrame: features including CPD score and location
+    """
     return features.merge(
         prepare_cpd_features(cpd_folder_name, lookback_window_length)[
             ["ticker", "cp_location_norm", "cp_score"]
