@@ -31,16 +31,18 @@ def calc_daily_vol(daily_returns):
     )
 
 
-def calc_vol_scaled_returns(daily_returns, daily_vol=None):
+def calc_vol_scaled_returns(daily_returns, daily_vol=pd.Series(None)):
     """calculates volatility scaled returns for annualised VOL_TARGET of 15%
     with input of pandas series daily_returns"""
-    if not daily_vol:
+    if not len(daily_vol):
         daily_vol = calc_daily_vol(daily_returns)
     annualised_vol = daily_vol * np.sqrt(252)  # annualised
     return daily_returns * VOL_TARGET / annualised_vol.shift(1)
 
 
-def calc_trend_intermediate_strategy(srs: pd.Series, w: float, volatility_scaling=True) -> pd.Series:
+def calc_trend_intermediate_strategy(
+    srs: pd.Series, w: float, volatility_scaling=True
+) -> pd.Series:
     """Calculate intermediate strategy
 
     Args:
@@ -62,9 +64,9 @@ def calc_trend_intermediate_strategy(srs: pd.Series, w: float, volatility_scalin
     )
 
     return (
-      w * np.sign(monthly_returns) * next_day_returns
-      +  (1-w) * np.sign(annual_returns) * next_day_returns
-  )
+        w * np.sign(monthly_returns) * next_day_returns
+        + (1 - w) * np.sign(annual_returns) * next_day_returns
+    )
 
 
 class MACDStrategy:

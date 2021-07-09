@@ -7,7 +7,9 @@ CPD_OUTPUT_FOLDER_DEFAULT = os.path.join(
     "data", f"commodities_cpd_{CPD_DEFAULT_LBW}lbw"
 )
 
-FEATURES_FILE_PATH_DEFAULT = os.path.join("data", f"features_cpd_{CPD_DEFAULT_LBW}lbw.csv")
+FEATURES_FILE_PATH_DEFAULT = os.path.join(
+    "data", f"features_cpd_{CPD_DEFAULT_LBW}lbw.csv"
+)
 
 # commodities from Yahoo Finance
 COMMODITIES_TICKERS = [

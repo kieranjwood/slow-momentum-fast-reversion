@@ -3,10 +3,16 @@ import os
 import numpy as np
 import pandas as pd
 
-from src.classical_strategies import MACDStrategy, calc_returns, calc_daily_vol, calc_vol_scaled_returns
+from src.classical_strategies import (
+    MACDStrategy,
+    calc_returns,
+    calc_daily_vol,
+    calc_vol_scaled_returns,
+)
 
 VOL_THRESHOLD = 5  # multiple to winsorise by
 HALFLIFE_WINSORISE = 252
+
 
 def read_changepoint_results_and_fill_na(
     file_path: str, lookback_window_length: int
@@ -85,7 +91,7 @@ def deep_momentum_strategy_features(df_asset: pd.DataFrame) -> pd.DataFrame:
     df_asset["daily_vol"] = calc_daily_vol(df_asset["daily_returns"])
     # vol scaling and shift to be next day returns
     df_asset["target_returns"] = calc_vol_scaled_returns(
-        df_asset["daily_returns"], df_asset["daily_returns"]
+        df_asset["daily_returns"], df_asset["daily_vol"]
     ).shift(-1)
 
     def calc_normalised_returns(day_offset):
@@ -131,7 +137,7 @@ def include_changepoint_features(
     Returns:
         pd.DataFrame: features including CPD score and location
     """
-    return features.merge(
+    features = features.merge(
         prepare_cpd_features(cpd_folder_name, lookback_window_length)[
             ["ticker", "cp_location_norm", "cp_score"]
         ]
@@ -144,3 +150,7 @@ def include_changepoint_features(
         .reset_index(),  # for date column
         on=["date", "ticker"],
     )
+
+    features.index = features["date"]
+
+    return features
