@@ -127,3 +127,8 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+
+data/*
+!data/pull_data.py
+!data/download_quandl_data.py
+!data/__init__.py

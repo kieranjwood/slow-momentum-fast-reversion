@@ -6,7 +6,6 @@ from typing import List, Tuple
 VOL_LOOKBACK = 60  # for ex-ante volatility
 VOL_TARGET = 0.15  # 15% volatility target
 
-
 def calc_returns(srs: pd.Series, day_offset: int = 1) -> pd.Series:
     """for each element of a pandas time-series srs,
     calculates the returns over the past number of days
