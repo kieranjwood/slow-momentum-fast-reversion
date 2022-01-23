@@ -14,7 +14,7 @@ This code accompanies the the paper [Slow Momentum with Fast Reversion: A Tradin
 
 ## Currently Implemented
 - [x] CPD Module
-- [x] Deep Momentum Network - see [Momementum Transformer](https://github.com/kieranjwood/Trading-with-the-Momentum-Transformer) repo
+- [x] Deep Momentum Network - see [Momementum Transformer](https://github.com/kieranjwood/trading-momentum-transformer) repo
 
 # References
 Please cite our paper with:
