@@ -1,6 +1,6 @@
 # Slow Momentum with Fast Reversion
 ## About
-This code accompanies the the paper [Slow Momentum with Fast Reversion: A Trading Strategy Using Deep Learning and Changepoint Detection](https://arxiv.org/pdf/2105.13727.pdf).
+This code accompanies the the paper [Slow Momentum with Fast Reversion: A Trading Strategy Using Deep Learning and Changepoint Detection](https://jfds.pm-research.com/content/iijjfds/4/1/111.full.pdf) and [preprint](https://arxiv.org/pdf/2105.13727.pdf).
 
 > :warning: This work has now been improved upon with the paper [Trading with the Momentum Transformer: An Intelligent and Interpretable Architecture](https://arxiv.org/pdf/2112.08534.pdf). Please refer to the [this repo](https://github.com/kieranjwood/trading-momentum-transformer) for the implementation of both the *Slow Momentum with Fast Reversion* and *Trading with the Momentum Transformer* papers.
 
